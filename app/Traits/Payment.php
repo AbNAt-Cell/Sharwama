@@ -48,6 +48,7 @@ trait Payment
             'mercadopago' => 'payment/mercadopago/pay',
             'bkash' => 'payment/bkash/make-payment',
             'paystack' => 'payment/paystack/pay',
+            'monnify' => 'payment/monnify/pay',
             'fatoorah' => 'payment/fatoorah/pay',
             'xendit' => 'payment/xendit/pay',
             'amazon_pay' => 'payment/amazon/pay',
