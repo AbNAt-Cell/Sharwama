@@ -1,0 +1,93 @@
+### Health Check
+GET http://localhost:8000/api/v1/health
+Accept: application/json
+
+###
+
+### Test Monnify Configuration
+GET http://localhost:8000/api/v1/test-monnify
+Accept: application/json
+
+###
+
+### Initialize Payment (Generic)
+POST http://localhost:8000/api/v1/payment/initialize
+Content-Type: application/json
+
+{
+  "amount": 150.50,
+  "currency": "USD",
+  "payment_method": "credit_card",
+  "customer_email": "test@example.com"
+}
+
+###
+
+### Get Payment Status (Generic)
+GET http://localhost:8000/api/v1/payment/status?payment_id=pay_12345
+Accept: application/json
+
+###
+
+### 🟢 MONNIFY TESTING - Initialize Payment (Realistic Test Response)
+POST http://localhost:8000/api/v1/payment/monnify/initialize
+Content-Type: application/json
+
+{
+  "amount": 5000.00,
+  "customer_name": "John Doe",
+  "customer_email": "john@example.com",
+  "customer_phone": "08123456789",
+  "payment_description": "Payment for order #12345",
+  "currency_code": "NGN",
+  "payment_methods": ["CARD", "ACCOUNT_TRANSFER"]
+}
+
+###
+
+### 🔍 MONNIFY TESTING - Verify Payment (Random Status)
+GET http://localhost:8000/api/v1/payment/monnify/verify?payment_reference=TEST_REF_12345
+Accept: application/json
+
+###
+
+### 🔔 MONNIFY TESTING - Webhook Test (Successful Transaction)
+POST http://localhost:8000/api/v1/payment/monnify/webhook
+Content-Type: application/json
+
+{
+  "eventType": "SUCCESSFUL_TRANSACTION",
+  "eventData": {
+    "transactionReference": "MNFY|20251026|123456",
+    "paymentReference": "TEST_REF_67890",
+    "amountPaid": "5000.00",
+    "totalPayable": "5000.00",
+    "settlementAmount": "4925.00",
+    "paymentMethod": "CARD",
+    "paymentStatus": "PAID",
+    "transactionHash": "hash123abc",
+    "currency": "NGN",
+    "paidOn": "2025-09-26T20:51:45.000Z",
+    "customerName": "John Doe",
+    "customerEmail": "john@example.com",
+    "customerPhoneNumber": "08123456789"
+  }
+}
+
+###
+
+### ✅ MONNIFY TESTING - Simulate Successful Payment
+GET http://localhost:8000/api/v1/payment/monnify/simulate-success/TEST_REF_12345
+Accept: application/json
+
+###
+
+### ❌ MONNIFY TESTING - Simulate Failed Payment  
+GET http://localhost:8000/api/v1/payment/monnify/simulate-failure/TEST_REF_12345
+Accept: application/json
+
+###
+
+### 🔄 MONNIFY TESTING - Callback Test
+GET http://localhost:8000/api/v1/payment/monnify/callback?paymentReference=TEST_REF_12345&transactionReference=MNFY|20251026|123456&status=PAID
+Accept: application/json
