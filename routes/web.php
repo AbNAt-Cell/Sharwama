@@ -155,6 +155,16 @@ if (!$is_published) {
             // Route::post('refund', 'BkashRefundController@refund')->name('bkash-refund');
         });
 
+        //MONNIFY
+        Route::group(['prefix' => 'monnify', 'as' => 'monnify.'], function () {
+            Route::get('pay', [\App\Http\Controllers\MonifyController::class, 'index'])->name('pay');
+            Route::post('initialize', [\App\Http\Controllers\MonifyController::class, 'initializePayment'])->name('initialize');
+            Route::any('callback', [\App\Http\Controllers\MonifyController::class, 'callback'])->name('callback');
+            Route::post('webhook', [\App\Http\Controllers\MonifyController::class, 'webhook'])->name('webhook')
+                ->withoutMiddleware([\App\Http\Middleware\VerifyCsrfToken::class]);
+        });
+
+
         //MERCADOPAGO
         Route::group(['prefix' => 'mercadopago', 'as' => 'mercadopago.'], function () {
             Route::get('pay', [MercadoPagoController::class, 'index'])->name('index');
