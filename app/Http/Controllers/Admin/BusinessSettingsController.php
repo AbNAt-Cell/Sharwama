@@ -333,7 +333,7 @@ class BusinessSettingsController extends Controller
         }
 
         $data_values = Setting::whereIn('settings_type', ['payment_config'])
-            ->whereIn('key_name', ['ssl_commerz', 'paypal', 'stripe', 'razor_pay', 'senang_pay', 'paystack', 'paymob_accept', 'flutterwave', 'bkash', 'mercadopago'])
+            ->whereIn('key_name', ['ssl_commerz', 'paypal', 'stripe', 'razor_pay', 'senang_pay', 'paystack', 'paymob_accept', 'flutterwave', 'bkash', 'mercadopago', 'monnify'])
             ->get();
 
         return view('admin-views.business-settings.payment-index', compact('published_status', 'payment_url', 'data_values'));
@@ -386,7 +386,7 @@ class BusinessSettingsController extends Controller
     {
 
         $validation = [
-            'gateway' => 'required|in:ssl_commerz,paypal,stripe,razor_pay,senang_pay,paystack,paymob_accept,flutterwave,bkash,mercadopago',
+            'gateway' => 'required|in:ssl_commerz,paypal,stripe,razor_pay,senang_pay,paystack,paymob_accept,flutterwave,bkash,mercadopago','monnify',
             'mode' => 'required|in:live,test'
         ];
 
@@ -461,6 +461,13 @@ class BusinessSettingsController extends Controller
                 'app_secret' => 'required_if:status,1',
                 'username' => 'required_if:status,1',
                 'password' => 'required_if:status,1',
+            ];
+        } elseif ($request['gateway'] == 'monnify') {
+            $additionalData = [
+                'status' => 'required|in:1,0',
+                'api_key' => 'required_if:status,1',
+                'secret_key' => 'required_if:status,1',
+                'contract_code' => 'required_if:status,1',
             ];
         }
 
