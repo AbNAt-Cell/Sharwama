@@ -14,40 +14,48 @@ return [
     | Monnify Configuration
     |--------------------------------------------------------------------------
     |
-    | Here you may configure your Monnify settings. Monnify is a payment gateway srevice
-    | provider.
-    |
+    | Here you may configure your Monnify settings. Monnify is a payment gateway service
+    | provider. Get your credentials from https://monnify.com
     |
     */
 
     /**
-     * Api key From Monnify
+     * Api key From Monnify Dashboard
      */
-    'api_key' => env('MK_TEST_8AGWBDUSGS'),
+    'api_key' => env('MONNIFY_API_KEY', 'MK_TEST_8AGWBDUSGS'),
 
     /**
-     * Secret key From Monnify
+     * Secret key From Monnify Dashboard
      */
-    'secret_key' => env('Y4FPBP1T72CGCP7RCVWNQCR80TYJ40AQ'),
+    'secret_key' => env('MONNIFY_SECRET_KEY', 'Y4FPBP1T72CGCP7RCVWNQCR80TYJ40AQ'),
 
     /**
-     * Api contract code From Monnify
+     * Contract code From Monnify Dashboard
      */
-    'contract_code' => env('2295851286'),
+    'contract_code' => env('MONNIFY_CONTRACT_CODE', '2295851286'),
 
     /**
-     * Api Wallet number From Monnify
+     * Wallet number From Monnify Dashboard (Optional)
      */
-    'wallet_number' => env('2631913247'),
+    'wallet_number' => env('MONNIFY_WALLET_NUMBER', '2631913247'),
 
     /**
-     * Api Account number From Monnify
+     * Account number From Monnify Dashboard (Optional)
      */
-    'account_number' => env('2631913247'),
+    'account_number' => env('MONNIFY_ACCOUNT_NUMBER', '2631913247'),
 
     /**
-     * Monnify environment: SANDBOX or LIVE
-     * default: 'SANDBOX'
+     * Monnify environment: 'SANDBOX' or 'LIVE'
+     * SANDBOX: https://sandbox.monnify.com
+     * LIVE: https://api.monnify.com
      */
-    'environment' => env('https://sandbox.monnify.com', 'SANDBOX'),
+    'environment' => env('MONNIFY_ENVIRONMENT', 'SANDBOX'),
+
+    /**
+     * Base URLs for API endpoints
+     */
+    'base_url' => [
+        'SANDBOX' => 'https://sandbox.monnify.com',
+        'LIVE' => 'https://api.monnify.com',
+    ],
 ];
