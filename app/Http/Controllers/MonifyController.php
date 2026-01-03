@@ -184,7 +184,12 @@ class MonifyController extends Controller
             if (isset($payment_data) && function_exists($payment_data->failure_hook)) {
                 call_user_func($payment_data->failure_hook, $payment_data);
             }
-            return $this->payment_response($payment_data, 'fail');
+            
+            // Return clean view instead of payment_response
+            return view('payment-callback', [
+                'status' => 'fail',
+                'reference' => $payment_data->transaction_id ?? 'N/A'
+            ]);
         }
 
         // Verify transaction
@@ -213,7 +218,11 @@ class MonifyController extends Controller
                         call_user_func($data->success_hook, $data);
                     }
 
-                    return $this->payment_response($data, 'success');
+                    // Return clean view instead of payment_response
+                    return view('payment-callback', [
+                        'status' => 'success',
+                        'reference' => $transactionReference
+                    ]);
                 }
             }
 
@@ -222,7 +231,11 @@ class MonifyController extends Controller
             if (isset($payment_data) && function_exists($payment_data->failure_hook)) {
                 call_user_func($payment_data->failure_hook, $payment_data);
             }
-            return $this->payment_response($payment_data, 'fail');
+            
+            return view('payment-callback', [
+                'status' => 'fail',
+                'reference' => $payment_data->transaction_id ?? 'N/A'
+            ]);
 
         } catch (\Exception $e) {
             Log::error('Monnify Callback Exception', ['error' => $e->getMessage()]);
@@ -230,9 +243,14 @@ class MonifyController extends Controller
             if (isset($payment_data) && function_exists($payment_data->failure_hook)) {
                 call_user_func($payment_data->failure_hook, $payment_data);
             }
-            return $this->payment_response($payment_data, 'fail');
+            
+            return view('payment-callback', [
+                'status' => 'fail',
+                'reference' => $payment_data->transaction_id ?? 'N/A'
+            ]);
         }
     }
+
 
     /**
      * Handle Monnify webhook notifications
