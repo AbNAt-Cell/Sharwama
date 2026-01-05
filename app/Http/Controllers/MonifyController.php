@@ -263,8 +263,14 @@ class MonifyController extends Controller
         $paymentReference = $request->input('paymentReference');
         $paymentId = $request->query('payment_id');
 
-        if (!$paymentReference && $paymentId && strpos($paymentId, '?paymentReference=') !== false) {
-            parse_str(substr($paymentId, strpos($paymentId, '?') + 1), $params);
+        // Clean payment_id if it contains query string
+        if ($paymentId && strpos($paymentId, '?') !== false) {
+            $paymentId = substr($paymentId, 0, strpos($paymentId, '?'));
+        }
+
+        // Extract payment reference from malformed payment_id if needed
+        if (!$paymentReference && $request->query('payment_id') && strpos($request->query('payment_id'), '?paymentReference=') !== false) {
+            parse_str(substr($request->query('payment_id'), strpos($request->query('payment_id'), '?') + 1), $params);
             $paymentReference = $params['paymentReference'] ?? null;
         }
 
