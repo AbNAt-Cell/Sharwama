@@ -56,12 +56,6 @@ class PaystackController extends Controller
             return response()->json($this->response_formatter(GATEWAYS_DEFAULT_204), 200);
         }
 
-        // Set external_redirect_link from session callback if not already set
-        if (empty($data->external_redirect_link) && session()->has('callback')) {
-            $data->external_redirect_link = session('callback');
-            $data->save();
-        }
-
         $payer = json_decode($data['payer_information']);
 
         $reference = Paystack::genTranxRef();
