@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Payment {{ $status === 'success' ? 'Successful' : 'Failed' }}</title>
+    <title>Payment {{ $status === 'success' ? 'Successful' : ($status === 'processing' ? 'Processing' : 'Failed') }}</title>
     @if(isset($redirect_url) && $redirect_url)
         <meta http-equiv="refresh" content="3;url={{ $redirect_url }}">
     @endif
@@ -18,7 +18,13 @@
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
             background:
-                {{ $status === 'success' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' }}
+                @if($status === 'success')
+                    linear-gradient(135deg, #667eea 0%, #764ba2 100%)
+                @elseif($status === 'processing')
+                    linear-gradient(135deg, #f093fb 0%, #f5576c 100%)
+                @else
+                    linear-gradient(135deg, #667eea 0%, #764ba2 100%)
+                @endif
             ;
             min-height: 100vh;
             display: flex;
@@ -41,7 +47,13 @@
             width: 80px;
             height: 80px;
             background:
-                {{ $status === 'success' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' }}
+                @if($status === 'success')
+                    linear-gradient(135deg, #667eea 0%, #764ba2 100%)
+                @elseif($status === 'processing')
+                    linear-gradient(135deg, #f093fb 0%, #f5576c 100%)
+                @else
+                    linear-gradient(135deg, #667eea 0%, #764ba2 100%)
+                @endif
             ;
             border-radius: 50%;
             margin: 0 auto 20px;
@@ -88,14 +100,18 @@
         <div class="icon">
             @if($status === 'success')
                 ✓
+            @elseif($status === 'processing')
+                ⏳
             @else
                 ✕
             @endif
         </div>
-        <h1>Payment {{ $status === 'success' ? 'Successful' : 'Failed' }}</h1>
+        <h1>Payment {{ $status === 'success' ? 'Successful' : ($status === 'processing' ? 'Processing' : 'Failed') }}</h1>
         <p>
             @if($status === 'success')
                 Your payment has been processed successfully.
+            @elseif($status === 'processing')
+                Your payment is being processed. You will be notified once completed.
             @else
                 We couldn't process your payment. Please try again.
             @endif
