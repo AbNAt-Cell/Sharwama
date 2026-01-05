@@ -112,11 +112,11 @@ class User extends Authenticatable
         $path = asset('public/assets/admin/img/160x160/img1.jpg');
 
         if (!is_null($image) && Storage::disk('public')->exists('profile/' . $image)) {
-            $path = asset('public/upload/profile/' . $image);
+            $path = asset('storage/app/public/profile/' . $image);
         }
         if ($this->user_type == 'kitchen') {
             if (!is_null($image) && Storage::disk('public')->exists('kitchen/' . $image)) {
-                $path = asset('public/upload/kitchen/' . $image);
+                $path = asset('storage/app/public/kitchen/' . $image);
             }
         }
         return $path;
