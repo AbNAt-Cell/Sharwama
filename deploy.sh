@@ -27,6 +27,12 @@ php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 
+# Create storage symlink for images
+if [ ! -L "public/storage" ]; then
+    echo "Creating storage symlink for images..."
+    php artisan storage:link
+fi
+
 # Set proper permissions
 chmod -R 775 storage bootstrap/cache
 chown -R www-data:www-data storage bootstrap/cache
