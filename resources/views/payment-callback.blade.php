@@ -121,7 +121,7 @@
         console.log('Payment callback loaded');
         console.log('Status: {{ $status }}');
         console.log('Redirect URL: {{ $redirect_url ?? "NOT SET" }}');
-        
+
         // Auto-redirect or close after showing status
         setTimeout(function () {
             @if(isset($redirect_url) && $redirect_url)
@@ -129,8 +129,8 @@
                 console.log('Redirecting to:', '{{ $redirect_url }}');
                 window.location.href = '{{ $redirect_url }}';
             @else
-                    // For Flutter WebView
-                    try {
+                        // For Flutter WebView
+                        try {
                     if (window.flutter_inappwebview && typeof window.flutter_inappwebview.callHandler === 'function') {
                         window.flutter_inappwebview.callHandler('paymentCallback', {
                             status: '{{ $status }}',
