@@ -361,7 +361,22 @@ class MonifyController extends Controller
         }
 
         // Find payment record
+        // First try by transaction_id
         $payment_data = $this->payment::where('transaction_id', $paymentReference)->first();
+
+        // If not found, extract payment UUID from paymentReference and search by id
+        // PaymentReference format: PAY-{uuid}-{timestamp}
+        if (!$payment_data && preg_match('/PAY-([a-f0-9\-]{36})-\d+/', $paymentReference, $matches)) {
+            $paymentId = $matches[1];
+            $payment_data = $this->payment::where('id', $paymentId)->first();
+
+            if ($payment_data) {
+                Log::info('Monnify Webhook: Found payment by ID extraction', [
+                    'paymentReference' => $paymentReference,
+                    'extractedId' => $paymentId
+                ]);
+            }
+        }
 
         if (!$payment_data) {
             Log::error('Monnify Webhook: Payment not found', ['paymentReference' => $paymentReference]);
