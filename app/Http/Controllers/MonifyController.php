@@ -326,34 +326,125 @@ class MonifyController extends Controller
 
     /**
      * Handle Monnify webhook notifications
+     * Validates signature, prevents duplicates, and handles all transaction statuses
      */
     public function webhook(Request $request)
     {
-        Log::info('Monnify Webhook Received', $request->all());
+        Log::info('Monnify Webhook Received', [
+            'headers' => $request->headers->all(),
+            'body' => $request->all()
+        ]);
+
+        // Validate webhook signature for security
+        $signature = $request->header('monnify-signature');
+        if (!$this->validateWebhookSignature($request->getContent(), $signature)) {
+            Log::warning('Monnify Webhook: Invalid signature');
+            return response()->json(['status' => 'invalid signature'], 401);
+        }
 
         $eventType = $request->input('eventType');
         $eventData = $request->input('eventData');
 
-        if ($eventType === 'SUCCESSFUL_TRANSACTION') {
-            $paymentReference = $eventData['paymentReference'] ?? null;
-            $transactionReference = $eventData['transactionReference'] ?? null;
-            $paymentStatus = $eventData['paymentStatus'] ?? null;
-
-            if ($paymentStatus === 'PAID' && $paymentReference) {
-                $this->payment::where(['transaction_id' => $paymentReference])->update([
-                    'payment_method' => 'monnify',
-                    'is_paid' => 1,
-                    'transaction_id' => $transactionReference,
-                ]);
-
-                $data = $this->payment::where(['transaction_id' => $paymentReference])->first();
-
-                if (isset($data) && function_exists($data->success_hook)) {
-                    call_user_func($data->success_hook, $data);
-                }
-            }
+        if (!$eventData) {
+            Log::error('Monnify Webhook: Missing event data');
+            return response()->json(['status' => 'missing data'], 400);
         }
 
-        return response()->json(['status' => 'received'], 200);
+        $paymentReference = $eventData['paymentReference'] ?? null;
+        $transactionReference = $eventData['transactionReference'] ?? null;
+        $paymentStatus = $eventData['paymentStatus'] ?? null;
+        $amountPaid = $eventData['amountPaid'] ?? null;
+
+        if (!$paymentReference) {
+            Log::error('Monnify Webhook: Missing payment reference');
+            return response()->json(['status' => 'missing reference'], 400);
+        }
+
+        // Find payment record
+        $payment_data = $this->payment::where('transaction_id', $paymentReference)->first();
+
+        if (!$payment_data) {
+            Log::error('Monnify Webhook: Payment not found', ['paymentReference' => $paymentReference]);
+            return response()->json(['status' => 'payment not found'], 404);
+        }
+
+        // Prevent duplicate processing
+        if ($payment_data->is_paid == 1) {
+            Log::info('Monnify Webhook: Payment already processed', ['paymentReference' => $paymentReference]);
+            return response()->json(['status' => 'already processed'], 200);
+        }
+
+        // Handle different payment statuses
+        if ($eventType === 'SUCCESSFUL_TRANSACTION' && $paymentStatus === 'PAID') {
+            // Update payment record
+            $payment_data->update([
+                'payment_method' => 'monnify',
+                'is_paid' => 1,
+                'transaction_id' => $transactionReference,
+            ]);
+
+            Log::info('Monnify Webhook: Payment marked as paid', [
+                'paymentReference' => $paymentReference,
+                'transactionReference' => $transactionReference,
+                'amount' => $amountPaid
+            ]);
+
+            // Call success hook to fulfill order
+            if (isset($payment_data) && function_exists($payment_data->success_hook)) {
+                call_user_func($payment_data->success_hook, $payment_data);
+            }
+
+            return response()->json(['status' => 'success'], 200);
+        } elseif ($paymentStatus === 'FAILED' || $paymentStatus === 'CANCELLED') {
+            Log::warning('Monnify Webhook: Payment failed or cancelled', [
+                'paymentReference' => $paymentReference,
+                'status' => $paymentStatus
+            ]);
+
+            // Call failure hook
+            if (function_exists($payment_data->failure_hook)) {
+                call_user_func($payment_data->failure_hook, $payment_data);
+            }
+
+            return response()->json(['status' => 'payment failed'], 200);
+        } else {
+            Log::info('Monnify Webhook: Payment pending or unknown status', [
+                'paymentReference' => $paymentReference,
+                'status' => $paymentStatus
+            ]);
+            return response()->json(['status' => 'pending'], 200);
+        }
+    }
+
+    /**
+     * Validate Monnify webhook signature
+     */
+    private function validateWebhookSignature($payload, $signature)
+    {
+        // Get Monnify API secret from config
+        $config = $this->payment_config('monnify', 'payment_config');
+
+        if (!$config) {
+            Log::warning('Monnify: Config not found, skipping signature validation');
+            return true; // Allow webhook if config is missing (for backward compatibility)
+        }
+
+        $values = null;
+        if ($config->mode == 'live') {
+            $values = json_decode($config->live_values);
+        } elseif ($config->mode == 'test') {
+            $values = json_decode($config->test_values);
+        }
+
+        if (!$values || !isset($values->secret_key)) {
+            Log::warning('Monnify: Secret key not found, skipping signature validation');
+            return true; // Allow webhook if secret key is missing
+        }
+
+        // Compute expected signature
+        $computedSignature = hash_hmac('sha512', $payload, $values->secret_key);
+
+        // Compare signatures
+        return hash_equals($computedSignature, $signature);
     }
 }

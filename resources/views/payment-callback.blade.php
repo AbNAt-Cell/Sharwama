@@ -129,8 +129,8 @@
                 console.log('Redirecting to:', '{{ $redirect_url }}');
                 window.location.href = '{{ $redirect_url }}';
             @else
-                        // For Flutter WebView
-                        try {
+                            // For Flutter WebView
+                            try {
                     if (window.flutter_inappwebview && typeof window.flutter_inappwebview.callHandler === 'function') {
                         window.flutter_inappwebview.callHandler('paymentCallback', {
                             status: '{{ $status }}',
