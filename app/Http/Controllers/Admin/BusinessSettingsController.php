@@ -32,11 +32,10 @@ class BusinessSettingsController extends Controller
 
     public function __construct(
         private BusinessSetting $business_setting,
-        private Currency        $currency,
-        private SocialMedia     $social_media,
-        private Branch          $branch
-    )
-    {
+        private Currency $currency,
+        private SocialMedia $social_media,
+        private Branch $branch
+    ) {
     }
 
     /**
@@ -267,7 +266,7 @@ class BusinessSettingsController extends Controller
     public function mailConfig(Request $request): RedirectResponse
     {
         $request->has('status') ? $request['status'] = 1 : $request['status'] = 0;
-        $this->InsertOrUpdateBusinessData(['key' => 'mail_config'],[
+        $this->InsertOrUpdateBusinessData(['key' => 'mail_config'], [
             'value' => json_encode([
                 "status" => $request['status'],
                 "name" => $request['name'],
@@ -386,7 +385,7 @@ class BusinessSettingsController extends Controller
     {
 
         $validation = [
-            'gateway' => 'required|in:ssl_commerz,paypal,stripe,razor_pay,senang_pay,paystack,paymob_accept,flutterwave,bkash,mercadopago','monnify',
+            'gateway' => 'required|in:ssl_commerz,paypal,stripe,razor_pay,senang_pay,paystack,paymob_accept,flutterwave,bkash,mercadopago,monnify',
             'mode' => 'required|in:live,test'
         ];
 
@@ -614,9 +613,9 @@ class BusinessSettingsController extends Controller
             $data = [
                 'key' => 'return_page',
                 'value' => json_encode([
-                    'status' => 0,
-                    'content' => ''
-                ]),
+                            'status' => 0,
+                            'content' => ''
+                        ]),
             ];
             $this->business_setting->insert($data);
         }
@@ -653,9 +652,9 @@ class BusinessSettingsController extends Controller
             $data = [
                 'key' => 'refund_page',
                 'value' => json_encode([
-                    'status' => 0,
-                    'content' => ''
-                ]),
+                            'status' => 0,
+                            'content' => ''
+                        ]),
             ];
             $this->business_setting->insert($data);
         }
@@ -692,9 +691,9 @@ class BusinessSettingsController extends Controller
             $data = [
                 'key' => 'cancellation_page',
                 'value' => json_encode([
-                    'status' => 0,
-                    'content' => ''
-                ]),
+                            'status' => 0,
+                            'content' => ''
+                        ]),
             ];
             $this->business_setting->insert($data);
         }
@@ -729,9 +728,9 @@ class BusinessSettingsController extends Controller
             $this->business_setting->insert([
                 'key' => 'order_pending_message',
                 'value' => json_encode([
-                    'status' => 0,
-                    'message' => '',
-                ]),
+                            'status' => 0,
+                            'message' => '',
+                        ]),
             ]);
         }
 
@@ -739,9 +738,9 @@ class BusinessSettingsController extends Controller
             $this->business_setting->insert([
                 'key' => 'order_confirmation_msg',
                 'value' => json_encode([
-                    'status' => 0,
-                    'message' => '',
-                ]),
+                            'status' => 0,
+                            'message' => '',
+                        ]),
             ]);
         }
 
@@ -749,9 +748,9 @@ class BusinessSettingsController extends Controller
             $this->business_setting->insert([
                 'key' => 'order_processing_message',
                 'value' => json_encode([
-                    'status' => 0,
-                    'message' => '',
-                ]),
+                            'status' => 0,
+                            'message' => '',
+                        ]),
             ]);
         }
 
@@ -759,9 +758,9 @@ class BusinessSettingsController extends Controller
             $this->business_setting->insert([
                 'key' => 'out_for_delivery_message',
                 'value' => json_encode([
-                    'status' => 0,
-                    'message' => '',
-                ]),
+                            'status' => 0,
+                            'message' => '',
+                        ]),
             ]);
         }
 
@@ -769,9 +768,9 @@ class BusinessSettingsController extends Controller
             $this->business_setting->insert([
                 'key' => 'order_delivered_message',
                 'value' => json_encode([
-                    'status' => 0,
-                    'message' => '',
-                ]),
+                            'status' => 0,
+                            'message' => '',
+                        ]),
             ]);
         }
 
@@ -779,9 +778,9 @@ class BusinessSettingsController extends Controller
             $this->business_setting->insert([
                 'key' => 'delivery_boy_assign_message',
                 'value' => json_encode([
-                    'status' => 0,
-                    'message' => '',
-                ]),
+                            'status' => 0,
+                            'message' => '',
+                        ]),
             ]);
         }
 
@@ -789,9 +788,9 @@ class BusinessSettingsController extends Controller
             $this->business_setting->insert([
                 'key' => 'delivery_boy_start_message',
                 'value' => json_encode([
-                    'status' => 0,
-                    'message' => '',
-                ]),
+                            'status' => 0,
+                            'message' => '',
+                        ]),
             ]);
         }
 
@@ -799,9 +798,9 @@ class BusinessSettingsController extends Controller
             $this->business_setting->insert([
                 'key' => 'delivery_boy_delivered_message',
                 'value' => json_encode([
-                    'status' => 0,
-                    'message' => '',
-                ]),
+                            'status' => 0,
+                            'message' => '',
+                        ]),
             ]);
         }
 
@@ -809,9 +808,9 @@ class BusinessSettingsController extends Controller
             $this->business_setting->insert([
                 'key' => 'customer_notify_message',
                 'value' => json_encode([
-                    'status' => 0,
-                    'message' => '',
-                ]),
+                            'status' => 0,
+                            'message' => '',
+                        ]),
             ]);
         }
 
@@ -819,9 +818,9 @@ class BusinessSettingsController extends Controller
             $this->business_setting->insert([
                 'key' => 'customer_notify_message_for_time_change',
                 'value' => json_encode([
-                    'status' => 0,
-                    'message' => '',
-                ]),
+                            'status' => 0,
+                            'message' => '',
+                        ]),
             ]);
         }
 
@@ -1636,14 +1635,16 @@ class BusinessSettingsController extends Controller
             $request['shipping_per_km'] = Helpers::get_business_settings('delivery_management')['shipping_per_km'];
         }
         if ($request['shipping_status'] == 1) {
-            $request->validate([
-                'min_shipping_charge' => 'required',
-                'shipping_per_km' => 'required',
-            ],
+            $request->validate(
+                [
+                    'min_shipping_charge' => 'required',
+                    'shipping_per_km' => 'required',
+                ],
                 [
                     'min_shipping_charge.required' => 'Minimum shipping charge is required while shipping method is active',
                     'shipping_per_km.required' => 'Shipping charge per Kilometer is required while shipping method is active',
-                ]);
+                ]
+            );
         }
 
         $this->InsertOrUpdateBusinessData(['key' => 'delivery_management'], [
@@ -1980,14 +1981,14 @@ class BusinessSettingsController extends Controller
         $id = $request->input('id');
         $existingSearchPlaceholder = null;
         foreach ($data as $key => $item) {
-            if ($item['id'] == (int)$id) {
+            if ($item['id'] == (int) $id) {
                 $existingSearchPlaceholder = $key;
                 break;
             }
         }
 
         if ($existingSearchPlaceholder !== null) {
-            $data[$existingSearchPlaceholder]['id'] = (int)$id;
+            $data[$existingSearchPlaceholder]['id'] = (int) $id;
             $data[$existingSearchPlaceholder]['placeholder_name'] = $request['placeholder_name'];
         } else {
             $newItem = [
@@ -2074,8 +2075,11 @@ class BusinessSettingsController extends Controller
             }
         }
 
-        $this->InsertOrUpdateBusinessData(['key' => 'maintenance_system_setup'], [
-            'value' => json_encode($selectedSystems)],
+        $this->InsertOrUpdateBusinessData(
+            ['key' => 'maintenance_system_setup'],
+            [
+                'value' => json_encode($selectedSystems)
+            ],
         );
 
         $this->InsertOrUpdateBusinessData(['key' => 'maintenance_duration_setup'], [
@@ -2095,7 +2099,7 @@ class BusinessSettingsController extends Controller
             ]),
         ]);
 
-        $maintenanceStatus = (integer)(Helpers::get_business_settings('maintenance_mode') ?? 0);
+        $maintenanceStatus = (integer) (Helpers::get_business_settings('maintenance_mode') ?? 0);
         $selectedMaintenanceDuration = Helpers::get_business_settings('maintenance_duration_setup') ?? [];
         $selectedMaintenanceSystem = Helpers::get_business_settings('maintenance_system_setup') ?? [];
         $isBranch = in_array('branch_panel', $selectedMaintenanceSystem) ? 1 : 0;
@@ -2205,7 +2209,7 @@ class BusinessSettingsController extends Controller
                 ],
                 'settings_type' => 'payment_config',
                 'mode' => 'test',
-                'is_active' => 0 ,
+                'is_active' => 0,
                 'additional_data' => null,
             ]);
         }
