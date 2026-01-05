@@ -28,7 +28,7 @@ class MonifyController extends Controller
     {
         $config = $this->payment_config('monnify', 'payment_config');
         $values = false;
-        
+
         if (!is_null($config) && $config->mode == 'live') {
             $values = json_decode($config->live_values);
         } elseif (!is_null($config) && $config->mode == 'test') {
@@ -40,7 +40,7 @@ class MonifyController extends Controller
             $this->api_key = $values->api_key ?? config('monnify.api_key');
             $this->secret_key = $values->secret_key ?? config('monnify.secret_key');
             $this->contract_code = $values->contract_code ?? config('monnify.contract_code');
-            
+
             // Set base URL based on mode
             $environment = ($config->mode == 'live') ? 'LIVE' : 'SANDBOX';
             $this->base_url = config('monnify.base_url')[$environment] ?? 'https://sandbox.monnify.com';
@@ -136,20 +136,20 @@ class MonifyController extends Controller
                 'Authorization' => 'Bearer ' . $accessToken,
                 'Content-Type' => 'application/json',
             ])->post($this->base_url . '/api/v1/merchant/transactions/init-transaction', [
-                'amount' => round($data->payment_amount, 2),
-                'customerName' => $payer->name ?? 'Customer',
-                'customerEmail' => $payer->email ?? 'customer@example.com',
-                'paymentReference' => $reference,
-                'paymentDescription' => 'Order Payment - ' . $data->attribute_id,
-                'currencyCode' => $data->currency_code ?? 'NGN',
-                'contractCode' => $this->contract_code,
-                'redirectUrl' => route('monnify.callback', ['payment_id' => $data->id]),
-                'paymentMethods' => ['CARD', 'ACCOUNT_TRANSFER']
-            ]);
+                        'amount' => round($data->payment_amount, 2),
+                        'customerName' => $payer->name ?? 'Customer',
+                        'customerEmail' => $payer->email ?? 'customer@example.com',
+                        'paymentReference' => $reference,
+                        'paymentDescription' => 'Order Payment - ' . $data->attribute_id,
+                        'currencyCode' => $data->currency_code ?? 'NGN',
+                        'contractCode' => $this->contract_code,
+                        'redirectUrl' => route('monnify.callback', ['payment_id' => $data->id]),
+                        'paymentMethods' => ['CARD', 'ACCOUNT_TRANSFER']
+                    ]);
 
             if ($response->successful()) {
                 $responseData = $response->json();
-                
+
                 if ($responseData['requestSuccessful']) {
                     // Update payment with reference
                     $data->transaction_id = $reference;
@@ -174,25 +174,46 @@ class MonifyController extends Controller
      */
     public function callback(Request $request)
     {
+        // Log all incoming parameters for debugging
+        Log::info('Monnify Callback Received', $request->all());
+
         $paymentReference = $request->input('paymentReference');
         $transactionReference = $request->input('transactionReference');
+        $paymentStatus = $request->input('paymentStatus');
+
+        // Look up payment by transaction_id (our paymentReference)
+        $payment_data = $this->payment::where('transaction_id', $paymentReference)->first();
+
+        if (!$payment_data) {
+            Log::error('Monnify Callback: Payment not found', ['paymentReference' => $paymentReference]);
+            return view('payment-callback', [
+                'status' => 'fail',
+                'reference' => $paymentReference ?? 'N/A',
+                'redirect_url' => null
+            ]);
+        }
 
         // Get access token
         $accessToken = $this->getAccessToken();
         if (!$accessToken) {
-            $payment_data = $this->payment::where(['id' => $request['payment_id']])->first();
-            if (isset($payment_data) && function_exists($payment_data->failure_hook)) {
+            Log::error('Monnify Callback: Failed to get access token');
+
+            if (function_exists($payment_data->failure_hook)) {
                 call_user_func($payment_data->failure_hook, $payment_data);
             }
-            
-            // Return clean view instead of payment_response
+
+            $redirectUrl = $payment_data->external_redirect_link
+                ? $payment_data->external_redirect_link . '/fail'
+                : null;
+
             return view('payment-callback', [
                 'status' => 'fail',
-                'reference' => $payment_data->transaction_id ?? 'N/A'
+                'reference' => $paymentReference ?? 'N/A',
+                'redirect_url' => $redirectUrl
             ]);
         }
 
-        // Verify transaction
+        // Verify transaction with Monnify API
         try {
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . $accessToken,
@@ -200,53 +221,82 @@ class MonifyController extends Controller
 
             if ($response->successful()) {
                 $responseData = $response->json();
+                Log::info('Monnify Transaction Verification', $responseData);
 
-                if ($responseData['requestSuccessful'] && 
-                    isset($responseData['responseBody']['paymentStatus']) && 
-                    $responseData['responseBody']['paymentStatus'] === 'PAID') {
+                if (
+                    $responseData['requestSuccessful'] &&
+                    isset($responseData['responseBody']['paymentStatus']) &&
+                    $responseData['responseBody']['paymentStatus'] === 'PAID'
+                ) {
 
-                    // Payment successful
-                    $this->payment::where(['transaction_id' => $paymentReference])->update([
+                    // Payment successful - update payment record
+                    $payment_data->update([
                         'payment_method' => 'monnify',
                         'is_paid' => 1,
                         'transaction_id' => $transactionReference,
                     ]);
 
-                    $data = $this->payment::where(['transaction_id' => $paymentReference])->first();
+                    Log::info('Monnify Payment Successful', [
+                        'payment_id' => $payment_data->id,
+                        'transaction_id' => $transactionReference
+                    ]);
 
-                    if (isset($data) && function_exists($data->success_hook)) {
-                        call_user_func($data->success_hook, $data);
+                    // Call success hook
+                    if (function_exists($payment_data->success_hook)) {
+                        call_user_func($payment_data->success_hook, $payment_data);
                     }
 
-                    // Return clean view instead of payment_response
+                    // Prepare redirect URL
+                    $redirectUrl = $payment_data->external_redirect_link
+                        ? $payment_data->external_redirect_link . '/success'
+                        : null;
+
                     return view('payment-callback', [
                         'status' => 'success',
-                        'reference' => $transactionReference
+                        'reference' => $transactionReference,
+                        'redirect_url' => $redirectUrl
                     ]);
                 }
             }
 
             // Payment failed or pending
-            $payment_data = $this->payment::where(['id' => $request['payment_id']])->first();
-            if (isset($payment_data) && function_exists($payment_data->failure_hook)) {
+            Log::warning('Monnify Payment Failed or Pending', [
+                'paymentReference' => $paymentReference,
+                'paymentStatus' => $paymentStatus
+            ]);
+
+            if (function_exists($payment_data->failure_hook)) {
                 call_user_func($payment_data->failure_hook, $payment_data);
             }
-            
+
+            $redirectUrl = $payment_data->external_redirect_link
+                ? $payment_data->external_redirect_link . '/fail'
+                : null;
+
             return view('payment-callback', [
                 'status' => 'fail',
-                'reference' => $payment_data->transaction_id ?? 'N/A'
+                'reference' => $paymentReference,
+                'redirect_url' => $redirectUrl
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Monnify Callback Exception', ['error' => $e->getMessage()]);
-            $payment_data = $this->payment::where(['id' => $request['payment_id']])->first();
-            if (isset($payment_data) && function_exists($payment_data->failure_hook)) {
+            Log::error('Monnify Callback Exception', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            if (function_exists($payment_data->failure_hook)) {
                 call_user_func($payment_data->failure_hook, $payment_data);
             }
-            
+
+            $redirectUrl = $payment_data->external_redirect_link
+                ? $payment_data->external_redirect_link . '/fail'
+                : null;
+
             return view('payment-callback', [
                 'status' => 'fail',
-                'reference' => $payment_data->transaction_id ?? 'N/A'
+                'reference' => $paymentReference ?? 'N/A',
+                'redirect_url' => $redirectUrl
             ]);
         }
     }
