@@ -117,21 +117,35 @@
     </div>
 
     <script>
+        // Debug: Log redirect URL
+        console.log('Payment callback loaded');
+        console.log('Status: {{ $status }}');
+        console.log('Redirect URL: {{ $redirect_url ?? "NOT SET" }}');
+        
         // Auto-redirect or close after showing status
-        setTimeout(function() {
+        setTimeout(function () {
             @if(isset($redirect_url) && $redirect_url)
                 // Redirect to app callback URL
+                console.log('Redirecting to:', '{{ $redirect_url }}');
                 window.location.href = '{{ $redirect_url }}';
             @else
-                // For Flutter WebView
-                if (window.flutter_inappwebview) {
-                    window.flutter_inappwebview.callHandler('paymentCallback', {
-                        status: '{{ $status }}',
-                        reference: '{{ $reference ?? '' }}'
-                    });
+                    // For Flutter WebView
+                    try {
+                    if (window.flutter_inappwebview && typeof window.flutter_inappwebview.callHandler === 'function') {
+                        window.flutter_inappwebview.callHandler('paymentCallback', {
+                            status: '{{ $status }}',
+                            reference: '{{ $reference ?? '' }}'
+                        });
+                    }
+                } catch (e) {
+                    console.log('Flutter WebView handler not available:', e);
                 }
                 // Try to close the window
-                window.close();
+                try {
+                    window.close();
+                } catch (e) {
+                    console.log('Cannot close window:', e);
+                }
             @endif
         }, 2000);
     </script>
