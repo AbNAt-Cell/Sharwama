@@ -183,9 +183,25 @@ class MonifyController extends Controller
         // Log all incoming parameters for debugging
         Log::info('Monnify Callback Received', $request->all());
 
+        // Monnify sends parameters with double ? instead of &, causing malformed URLs
+        // Example: callback?payment_id=xxx?paymentReference=yyy&transactionReference=zzz
+        // We need to parse this correctly
+
         $paymentReference = $request->input('paymentReference');
         $transactionReference = $request->input('transactionReference');
         $paymentStatus = $request->input('paymentStatus');
+
+        // If paymentReference is null, try to extract it from payment_id
+        if (!$paymentReference && $request->has('payment_id')) {
+            $paymentIdParam = $request->input('payment_id');
+            // Check if payment_id contains the paymentReference
+            if (strpos($paymentIdParam, '?paymentReference=') !== false) {
+                parse_str(substr($paymentIdParam, strpos($paymentIdParam, '?') + 1), $params);
+                $paymentReference = $params['paymentReference'] ?? null;
+                $transactionReference = $transactionReference ?? ($params['transactionReference'] ?? null);
+                $paymentStatus = $paymentStatus ?? ($params['paymentStatus'] ?? null);
+            }
+        }
 
         // Look up payment by transaction_id (our paymentReference)
         $payment_data = $this->payment::where('transaction_id', $paymentReference)->first();
