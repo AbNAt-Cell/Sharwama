@@ -80,6 +80,112 @@ class MonifyController extends Controller
     }
 
     /**
+     * API endpoint to verify payment status immediately
+     * Called by Flutter app after payment callback for instant verification
+     */
+    public function verifyPaymentStatus(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'payment_reference' => 'required|string'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid payment reference',
+                'errors' => $validator->errors()
+            ], 400);
+        }
+
+        $paymentReference = $request->input('payment_reference');
+
+        try {
+            // Get access token
+            $accessToken = $this->getAccessToken();
+            if (!$accessToken) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to authenticate with payment gateway'
+                ], 500);
+            }
+
+            // Verify transaction with Monnify API
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $accessToken,
+            ])->get($this->base_url . '/api/v2/transactions/' . urlencode($paymentReference));
+
+            if (!$response->successful()) {
+                Log::warning('Monnify Verification Failed', [
+                    'paymentReference' => $paymentReference,
+                    'status' => $response->status()
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to verify payment',
+                    'payment_status' => 'PENDING'
+                ], 200);
+            }
+
+            $data = $response->json();
+
+            if ($data['requestSuccessful'] && isset($data['responseBody'])) {
+                $paymentData = $data['responseBody'];
+                $paymentStatus = $paymentData['paymentStatus'];
+
+                // Find payment record
+                $payment_record = $this->payment::where('transaction_id', $paymentReference)->first();
+
+                if ($payment_record && $paymentStatus === 'PAID' && !$payment_record->is_paid) {
+                    // Update payment record
+                    $payment_record->update([
+                        'payment_method' => 'monnify',
+                        'is_paid' => 1,
+                        'transaction_id' => $paymentData['transactionReference'],
+                    ]);
+
+                    // Call success hook to fulfill order
+                    if (function_exists($payment_record->success_hook)) {
+                        call_user_func($payment_record->success_hook, $payment_record);
+                    }
+
+                    Log::info('Monnify Payment Verified and Processed', [
+                        'paymentReference' => $paymentReference,
+                        'transactionReference' => $paymentData['transactionReference']
+                    ]);
+                }
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Payment verified successfully',
+                    'payment_status' => $paymentStatus,
+                    'transaction_reference' => $paymentData['transactionReference'] ?? null,
+                    'amount_paid' => $paymentData['amountPaid'] ?? null,
+                    'is_paid' => $payment_record ? $payment_record->is_paid : 0
+                ], 200);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid response from payment gateway',
+                'payment_status' => 'UNKNOWN'
+            ], 500);
+
+        } catch (\Exception $e) {
+            Log::error('Monnify Verification Exception', [
+                'error' => $e->getMessage(),
+                'paymentReference' => $paymentReference
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred while verifying payment',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Initialize Monnify payment page
      */
     public function index(Request $request)
@@ -214,32 +320,6 @@ class MonifyController extends Controller
                 'redirect_url' => null
             ]);
         }
-
-        // Get access token
-        $accessToken = $this->getAccessToken();
-        if (!$accessToken) {
-            Log::error('Monnify Callback: Failed to get access token');
-
-            if (function_exists($payment_data->failure_hook)) {
-                call_user_func($payment_data->failure_hook, $payment_data);
-            }
-
-            $redirectUrl = $payment_data->external_redirect_link
-                ? $payment_data->external_redirect_link . '/fail'
-                : null;
-
-            return view('payment-callback', [
-                'status' => 'fail',
-                'reference' => $paymentReference ?? 'N/A',
-                'redirect_url' => $redirectUrl
-            ]);
-        }
-
-        // Verify transaction with Monnify API
-        try {
-            $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $accessToken,
-            ])->get($this->base_url . '/api/v2/transactions/' . urlencode($transactionReference));
 
             if ($response->successful()) {
                 $responseData = $response->json();

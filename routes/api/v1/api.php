@@ -33,7 +33,7 @@ use App\Http\Controllers\Api\V1\PaymentController;
 
 Route::group(['namespace' => 'Api\V1', 'middleware' => 'localization'], function () {
 
-        // Health check endpoint
+    // Health check endpoint
     Route::get('health', function () {
         return response()->json([
             'status' => 'ok',
@@ -47,7 +47,8 @@ Route::group(['namespace' => 'Api\V1', 'middleware' => 'localization'], function
     Route::get('monnify/test-connection', [PaymentController::class, 'testConnection']);
 
     // Monnify payment integration
-    Route::get('monnify/test-connection', [PaymentController::class, 'testConnection']);    Route::post('monnify/initialize', [PaymentController::class, 'monnifyInitialize']);
+    Route::get('monnify/test-connection', [PaymentController::class, 'testConnection']);
+    Route::post('monnify/initialize', [PaymentController::class, 'monnifyInitialize']);
 
     // Test Monnify configuration
     Route::get('test-monnify', function () {
@@ -98,10 +99,13 @@ Route::group(['namespace' => 'Api\V1', 'middleware' => 'localization'], function
         Route::post('registration-with-social-media', [CustomerAuthController::class, 'registrationWithSocialMedia']);
         Route::get('monnify/test-connection', [PaymentController::class, 'testConnection']);
         Route::post('monnify/initialize', [PaymentController::class, 'monnifyInitialize']);
-    Route::post('monnify/verify', [PaymentController::class, 'monnifyVerifyPayment']);
-    Route::post('monnify/webhook', [PaymentController::class, 'monnifyWebhook']);
+        Route::post('monnify/verify', [PaymentController::class, 'monnifyVerifyPayment']);
+        Route::post('monnify/webhook', [PaymentController::class, 'monnifyWebhook']);
         Route::post('monnify/verify', [PaymentController::class, 'monnifyVerifyPayment']);
         Route::post('monnify/webhook', [PaymentController::class, 'monnifyWebhook'])->name('monnify.webhook');
+
+        // Monnify payment verification endpoint
+        Route::post('monnify/verify-payment', [\App\Http\Controllers\MonifyController::class, 'verifyPaymentStatus'])->name('monnify.verify');
 
         Route::post('forgot-password', [PasswordResetController::class, 'passwordResetRequest']);
         Route::post('verify-token', [PasswordResetController::class, 'verifyToken']);
