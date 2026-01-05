@@ -1,0 +1,38 @@
+---
+deployment:
+  tasks:
+    # Clear any existing files in public_html (optional - remove if you want to keep existing files)
+    # - export DEPLOYPATH=/home/username/public_html/
+    # - /bin/rm -Rf $DEPLOYPATH
+    
+    # Copy all files to public_html
+    - export DEPLOYPATH=/home/egqcvktb/app.sharwamahut.com
+    - /bin/cp -R * $DEPLOYPATH
+    
+    # Copy hidden files (like .env, .htaccess)
+    - /bin/cp -R .[^.]* $DEPLOYPATH
+    
+    # Set proper permissions
+    - /bin/chmod 755 $DEPLOYPATH
+    - /bin/chmod -R 755 $DEPLOYPATH/storage
+    - /bin/chmod -R 755 $DEPLOYPATH/bootstrap/cache
+    
+    # Install/Update Composer dependencies (production mode)
+    - cd $DEPLOYPATH && /usr/local/bin/ea-php82 /opt/cpanel/composer/bin/composer install --no-dev --optimize-autoloader
+    
+    # Clear and cache Laravel configurations
+    - cd $DEPLOYPATH && /usr/local/bin/ea-php82 artisan config:clear
+    - cd $DEPLOYPATH && /usr/local/bin/ea-php82 artisan cache:clear
+    - cd $DEPLOYPATH && /usr/local/bin/ea-php82 artisan route:clear
+    - cd $DEPLOYPATH && /usr/local/bin/ea-php82 artisan view:clear
+    
+    # Optimize Laravel for production
+    - cd $DEPLOYPATH && /usr/local/bin/ea-php82 artisan config:cache
+    - cd $DEPLOYPATH && /usr/local/bin/ea-php82 artisan route:cache
+    - cd $DEPLOYPATH && /usr/local/bin/ea-php82 artisan view:cache
+    
+    # Run database migrations (optional - uncomment if needed)
+    # - cd $DEPLOYPATH && /usr/local/bin/ea-php82 artisan migrate --force
+    
+    # Create storage link if it doesn't exist
+    - cd $DEPLOYPATH && /usr/local/bin/ea-php82 artisan storage:link

@@ -26,7 +26,18 @@ class User extends Authenticatable
      * @var array
      */
     protected $fillable = [
-        'name', 'f_name', 'l_name', 'phone', 'email', 'password', 'point', 'is_active', 'user_type', 'refer_code', 'refer_by', 'language_code'
+        'name',
+        'f_name',
+        'l_name',
+        'phone',
+        'email',
+        'password',
+        'point',
+        'is_active',
+        'user_type',
+        'refer_code',
+        'refer_by',
+        'language_code'
     ];
 
     /**
@@ -35,7 +46,8 @@ class User extends Authenticatable
      * @var array
      */
     protected $hidden = [
-        'password', 'remember_token',
+        'password',
+        'remember_token',
     ];
 
     /**
@@ -100,11 +112,11 @@ class User extends Authenticatable
         $path = asset('public/assets/admin/img/160x160/img1.jpg');
 
         if (!is_null($image) && Storage::disk('public')->exists('profile/' . $image)) {
-            $path = asset('storage/app/public/profile/' . $image);
+            $path = asset('storage/profile/' . $image);
         }
-        if ($this->user_type == 'kitchen'){
+        if ($this->user_type == 'kitchen') {
             if (!is_null($image) && Storage::disk('public')->exists('kitchen/' . $image)) {
-                $path = asset('storage/app/public/kitchen/' . $image);
+                $path = asset('storage/kitchen/' . $image);
             }
         }
         return $path;
