@@ -124,6 +124,12 @@ class MonifyController extends Controller
         $payer = json_decode($data['payer_information']);
         $reference = 'PAY-' . $data->id . '-' . time();
 
+        // Set external_redirect_link from session callback if not already set
+        if (empty($data->external_redirect_link) && session()->has('callback')) {
+            $data->external_redirect_link = session('callback');
+            $data->save();
+        }
+
         // Get access token
         $accessToken = $this->getAccessToken();
         if (!$accessToken) {
