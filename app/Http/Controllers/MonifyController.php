@@ -7,9 +7,9 @@ use App\Models\User;
 use App\Traits\Processor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Monnify\MonnifyLaravel\Facades\Monnify;
 
 class MonifyController extends Controller
 {
@@ -17,60 +17,11 @@ class MonifyController extends Controller
 
     private PaymentRequest $payment;
     private $user;
-    private $config_values;
-    private $base_url;
-    private $api_key;
-    private $secret_key;
-    private $contract_code;
 
     public function __construct(PaymentRequest $payment, User $user)
     {
-        $config = $this->payment_config('monnify', 'payment_config');
-        $values = false;
-
-        if (!is_null($config) && $config->mode == 'live') {
-            $values = json_decode($config->live_values);
-        } elseif (!is_null($config) && $config->mode == 'test') {
-            $values = json_decode($config->test_values);
-        }
-
-        if ($values) {
-            $this->config_values = $values;
-            $this->api_key = $values->api_key ?? config('monnify.api_key');
-            $this->secret_key = $values->secret_key ?? config('monnify.secret_key');
-            $this->contract_code = $values->contract_code ?? config('monnify.contract_code');
-
-            $environment = ($config->mode == 'live') ? 'LIVE' : 'SANDBOX';
-            $this->base_url = config('monnify.base_url')[$environment] ?? 'https://sandbox.monnify.com';
-        } else {
-            $environment = config('monnify.environment', 'SANDBOX');
-            $this->api_key = config('monnify.api_key');
-            $this->secret_key = config('monnify.secret_key');
-            $this->contract_code = config('monnify.contract_code');
-            $this->base_url = config('monnify.base_url')[$environment] ?? 'https://sandbox.monnify.com';
-        }
-
         $this->payment = $payment;
         $this->user = $user;
-    }
-
-    private function getAccessToken()
-    {
-        try {
-            $response = Http::withBasicAuth($this->api_key, $this->secret_key)
-                ->post($this->base_url . '/api/v1/auth/login');
-
-            if ($response->successful()) {
-                $data = $response->json();
-                return $data['responseBody']['accessToken'] ?? null;
-            }
-
-            Log::error('Monnify Auth Failed', ['response' => $response->json()]);
-            return null;
-        } catch (\Exception $e) {
-            Log::error('Monnify Auth Exception', ['error' => $e->getMessage()]);
-            return null;
-        }
     }
 
     public function verifyPaymentStatus(Request $request)
@@ -90,35 +41,11 @@ class MonifyController extends Controller
         $paymentReference = $request->input('payment_reference');
 
         try {
-            $accessToken = $this->getAccessToken();
-            if (!$accessToken) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Failed to authenticate with payment gateway'
-                ], 500);
-            }
+            // Use Monnify package to get transaction status
+            $response = Monnify::transactions()->getStatus($paymentReference);
 
-            $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $accessToken,
-            ])->get($this->base_url . '/api/v2/transactions/' . urlencode($paymentReference));
-
-            if (!$response->successful()) {
-                Log::warning('Monnify Verification Failed', [
-                    'paymentReference' => $paymentReference,
-                    'status' => $response->status()
-                ]);
-
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Failed to verify payment',
-                    'payment_status' => 'PENDING'
-                ], 200);
-            }
-
-            $data = $response->json();
-
-            if ($data['requestSuccessful'] && isset($data['responseBody'])) {
-                $paymentData = $data['responseBody'];
+            if ($response['requestSuccessful'] && isset($response['responseBody'])) {
+                $paymentData = $response['responseBody'];
                 $paymentStatus = $paymentData['paymentStatus'];
 
                 $payment_record = $this->payment::where('transaction_id', $paymentReference)->first();
@@ -214,45 +141,36 @@ class MonifyController extends Controller
             $data->save();
         }
 
-        $accessToken = $this->getAccessToken();
-        if (!$accessToken) {
-            return response()->json(['error' => 'Unable to authenticate with Monnify'], 500);
-        }
-
         try {
-            $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $accessToken,
-                'Content-Type' => 'application/json',
-            ])->post($this->base_url . '/api/v1/merchant/transactions/init-transaction', [
-                        'amount' => round($data->payment_amount, 2),
-                        'customerName' => $payer->name ?? 'Customer',
-                        'customerEmail' => $payer->email ?? 'customer@example.com',
-                        'paymentReference' => $reference,
-                        'paymentDescription' => 'Order Payment - ' . $data->attribute_id,
-                        'currencyCode' => $data->currency_code ?? 'NGN',
-                        'contractCode' => $this->contract_code,
-                        'redirectUrl' => route('monnify.callback', ['payment_id' => $data->id]),
-                        'paymentMethods' => ['CARD', 'ACCOUNT_TRANSFER']
-                    ]);
+            // Use Monnify package to initialize transaction
+            $paymentData = [
+                'amount' => round($data->payment_amount, 2),
+                'customerName' => $payer->name ?? 'Customer',
+                'customerEmail' => $payer->email ?? 'customer@example.com',
+                'paymentReference' => $reference,
+                'paymentDescription' => 'Order Payment - ' . $data->attribute_id,
+                'currencyCode' => $data->currency_code ?? 'NGN',
+                'contractCode' => config('monnify.contract_code'),
+                'redirectUrl' => route('monnify.callback', ['payment_id' => $data->id]),
+                'paymentMethods' => ['CARD', 'ACCOUNT_TRANSFER']
+            ];
 
-            if ($response->successful()) {
-                $responseData = $response->json();
+            $response = Monnify::transactions()->initialise($paymentData);
 
-                if ($responseData['requestSuccessful']) {
-                    $data->transaction_id = $reference;
-                    $data->save();
+            if ($response['requestSuccessful']) {
+                $data->transaction_id = $reference;
+                $data->save();
 
-                    $checkoutUrl = $responseData['responseBody']['checkoutUrl'];
-                    return redirect()->away($checkoutUrl);
-                }
+                $checkoutUrl = $response['responseBody']['checkoutUrl'];
+                return redirect()->away($checkoutUrl);
             }
 
-            Log::error('Monnify Init Failed', ['response' => $response->json()]);
+            Log::error('Monnify Init Failed', ['response' => $response]);
             return response()->json(['error' => 'Payment initialization failed'], 500);
 
         } catch (\Exception $e) {
             Log::error('Monnify Init Exception', ['error' => $e->getMessage()]);
-            return response()->json(['error' => 'Payment initialization error'], 500);
+            return response()->json(['error' => 'Payment initialization error: ' . $e->getMessage()], 500);
         }
     }
 
@@ -291,24 +209,19 @@ class MonifyController extends Controller
         }
 
         try {
-            $accessToken = $this->getAccessToken();
             $status = 'processing';
 
-            if ($accessToken && $paymentReference) {
-                $response = Http::withHeaders(['Authorization' => 'Bearer ' . $accessToken])
-                    ->get($this->base_url . '/api/v2/transactions/' . urlencode($paymentReference));
+            if ($paymentReference) {
+                // Use Monnify package to verify payment
+                $response = Monnify::transactions()->getStatus($paymentReference);
+                Log::info('Monnify Callback Verification', $response);
 
-                if ($response->successful()) {
-                    $responseData = $response->json();
-                    Log::info('Monnify Callback Verification', $responseData);
-
-                    if ($responseData['requestSuccessful'] && isset($responseData['responseBody']['paymentStatus'])) {
-                        $apiStatus = $responseData['responseBody']['paymentStatus'];
-                        if ($apiStatus === 'PAID') {
-                            $status = 'success';
-                        } elseif (in_array($apiStatus, ['FAILED', 'CANCELLED'])) {
-                            $status = 'fail';
-                        }
+                if ($response['requestSuccessful'] && isset($response['responseBody']['paymentStatus'])) {
+                    $apiStatus = $response['responseBody']['paymentStatus'];
+                    if ($apiStatus === 'PAID') {
+                        $status = 'success';
+                    } elseif (in_array($apiStatus, ['FAILED', 'CANCELLED'])) {
+                        $status = 'fail';
                     }
                 }
             }
@@ -398,28 +311,6 @@ class MonifyController extends Controller
         }
 
         if ($eventType === 'SUCCESSFUL_TRANSACTION' && $paymentStatus === 'PAID') {
-            // Optional extra verification
-            $accessToken = $this->getAccessToken();
-            if ($accessToken) {
-                try {
-                    $response = Http::withHeaders(['Authorization' => 'Bearer ' . $accessToken])
-                        ->get($this->base_url . '/api/v2/transactions/' . urlencode($paymentReference));
-
-                    if ($response->successful()) {
-                        $apiData = $response->json();
-                        if ($apiData['requestSuccessful'] && ($apiData['responseBody']['paymentStatus'] ?? null) !== 'PAID') {
-                            Log::warning('Monnify Webhook: Status mismatch', [
-                                'paymentReference' => $paymentReference,
-                                'apiStatus' => $apiData['responseBody']['paymentStatus'] ?? 'unknown'
-                            ]);
-                            return response()->json(['message' => 'Status mismatch'], 200);
-                        }
-                    }
-                } catch (\Exception $e) {
-                    Log::warning('Monnify Webhook: API re-verification failed', ['error' => $e->getMessage()]);
-                }
-            }
-
             $payment_data->update([
                 'payment_method' => 'monnify',
                 'is_paid' => 1,
