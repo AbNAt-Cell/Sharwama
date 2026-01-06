@@ -21,7 +21,8 @@ use function App\CentralLogics\translate;
 
 class PaymentController extends Controller
 {
-    public function __construct(){
+    public function __construct()
+    {
         // Removed problematic eval() code to fix class conflict
     }
 
@@ -48,8 +49,8 @@ class PaymentController extends Controller
         }
 
         $order_amount = session('order_amount');
-        $customer_id  = session('customer_id');
-        $is_guest     = session('is_guest') == 1 ? 1 : 0;
+        $customer_id = session('customer_id');
+        $is_guest = session('is_guest') == 1 ? 1 : 0;
 
         if (!isset($order_amount)) {
             return response()->json(['errors' => ['message' => 'Amount not found']], 403);
@@ -64,17 +65,17 @@ class PaymentController extends Controller
         }
 
         //partial payment validation
-        if ($request['is_partial'] == 1){
-            if ($is_guest == 1){
+        if ($request['is_partial'] == 1) {
+            if ($is_guest == 1) {
                 return response()->json(['errors' => [['code' => 'payment_method', 'message' => translate('partial order does not applicable for guest user')]]], 403);
             }
 
             $customer = User::firstWhere(['id' => $customer_id, 'is_active' => 1]);
 
-            if (Helpers::get_business_settings('wallet_status') != 1){
+            if (Helpers::get_business_settings('wallet_status') != 1) {
                 return response()->json(['errors' => [['code' => 'payment_method', 'message' => translate('customer_wallet_status_is_disable')]]], 403);
             }
-            if (isset($customer) && $customer->wallet_balance < 1){
+            if (isset($customer) && $customer->wallet_balance < 1) {
                 return response()->json(['errors' => [['code' => 'payment_method', 'message' => translate('since your wallet balance is less than 1, you can not place partial order')]]], 403);
             }
             $order_amount -= $customer->wallet_balance;
@@ -89,7 +90,7 @@ class PaymentController extends Controller
         $is_add_fund = $request['is_add_fund'];
         if ($is_add_fund == 1) {
             $add_fund_to_wallet = Helpers::get_business_settings('add_fund_to_wallet');
-            if ($add_fund_to_wallet == 0){
+            if ($add_fund_to_wallet == 0) {
                 return response()->json(['errors' => ['message' => 'Add fund to wallet is not active']], 403);
             }
 
@@ -98,7 +99,7 @@ class PaymentController extends Controller
                 return response()->json(['errors' => ['message' => 'Customer not found']], 403);
             }
 
-            $payer = new Payer($customer['f_name'].' '.$customer['l_name'], $customer['email'], $customer['phone'], '');
+            $payer = new Payer($customer['f_name'] . ' ' . $customer['l_name'], $customer['email'], $customer['phone'], '');
 
             $payment_info = new PaymentInfo(
                 success_hook: 'add_fund_success',
@@ -115,7 +116,7 @@ class PaymentController extends Controller
                 attribute_id: time()
             );
 
-            $receiver_info = new Receiver('receiver_name','example.png');
+            $receiver_info = new Receiver('receiver_name', 'example.png');
             $redirect_link = Payment::generate_link($payer, $payment_info, $receiver_info);
             return redirect($redirect_link);
         }
@@ -123,14 +124,14 @@ class PaymentController extends Controller
         //order place
         if ($is_guest == 1) {//guest order
             $address = CustomerAddress::where(['user_id' => $customer_id, 'is_guest' => 1])->first();
-            if ($address){
+            if ($address) {
                 $customer = collect([
                     'f_name' => $address['contact_person_name'] ?? '',
                     'l_name' => '',
                     'phone' => $address['contact_person_number'] ?? '',
                     'email' => '',
                 ]);
-            }else{
+            } else {
                 $customer = collect([
                     'f_name' => 'example',
                     'l_name' => 'customer',
@@ -151,7 +152,32 @@ class PaymentController extends Controller
             ]);
         }
 
-        $payer = new Payer($customer['f_name'] . ' ' . $customer['l_name'] , $customer['email'], $customer['phone'], '');
+        $payer = new Payer($customer['f_name'] . ' ' . $customer['l_name'], $customer['email'], $customer['phone'], '');
+
+        // Extract order data from request if available
+        $orderData = null;
+        if ($request->has('order_data')) {
+            // Order data sent directly
+            $orderData = $request->order_data;
+        } elseif ($request->has('token')) {
+            // Try to extract from token (base64 encoded)
+            try {
+                $decoded = base64_decode($request->token);
+                $params = explode('&&', $decoded);
+                foreach ($params as $param) {
+                    if (strpos($param, 'order_data=') === 0) {
+                        $orderDataEncoded = substr($param, strlen('order_data='));
+                        $orderData = json_decode(base64_decode($orderDataEncoded), true);
+                        break;
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::warning('Failed to extract order data from token', ['error' => $e->getMessage()]);
+            }
+        }
+
+        // Store order data as JSON string, or 'order' as fallback
+        $attributeValue = $orderData ? json_encode($orderData) : 'order';
 
         $payment_info = new PaymentInfo(
             success_hook: 'order_place',
@@ -164,11 +190,11 @@ class PaymentController extends Controller
             additional_data: $additional_data,
             payment_amount: $order_amount,
             external_redirect_link: session('callback'),
-            attribute: 'order',
-            attribute_id: time()
+            attribute: $attributeValue,  // Store complete order data as JSON
+            attribute_id: null  // Will be set to order ID after creation
         );
 
-        $receiver_info = new Receiver('receiver_name','example.png');
+        $receiver_info = new Receiver('receiver_name', 'example.png');
 
         $redirect_link = Payment::generate_link($payer, $payment_info, $receiver_info);
 
@@ -198,41 +224,41 @@ class PaymentController extends Controller
     public function monnifyInitialize(Request $request)
     {
         $request->validate([
-            'amount'   => 'required|numeric|min:1',
-            'email'    => 'required|email',
-            'name'     => 'required|string',
+            'amount' => 'required|numeric|min:1',
+            'email' => 'required|email',
+            'name' => 'required|string',
             'currency' => 'nullable|string'
         ]);
 
-        $amount   = $request->amount;
+        $amount = $request->amount;
         $currency = $request->currency ?? 'NGN';
-        $email    = $request->email;
-        $name     = $request->name;
+        $email = $request->email;
+        $name = $request->name;
 
         $reference = 'PAY-' . uniqid();
 
         $payment = PaymentModel::create([
-            'reference'      => $reference,
-            'amount'         => $amount,
-            'currency'       => $currency,
-            'customer_name'  => $name,
+            'reference' => $reference,
+            'amount' => $amount,
+            'currency' => $currency,
+            'customer_name' => $name,
             'customer_email' => $email,
-            'status'         => 'pending',
+            'status' => 'pending',
         ]);
 
         $response = Monnify::initializePayment([
-            'amount'           => $amount,
-            'customerName'     => $name,
-            'customerEmail'    => $email,
+            'amount' => $amount,
+            'customerName' => $name,
+            'customerEmail' => $email,
             'paymentReference' => $reference,
             'paymentDescription' => 'Order Payment',
-            'currencyCode'     => $currency,
-            'redirectUrl'      => route('monnify.webhook'),
+            'currencyCode' => $currency,
+            'redirectUrl' => route('monnify.webhook'),
         ]);
 
         return response()->json([
             'payment_url' => $response['checkoutUrl'] ?? null,
-            'reference'   => $reference,
+            'reference' => $reference,
         ]);
     }
 
@@ -240,9 +266,9 @@ class PaymentController extends Controller
     {
         Log::info('Monnify webhook:', $request->all());
 
-        $reference   = $request->input('paymentReference');
+        $reference = $request->input('paymentReference');
         $transaction = $request->input('transactionReference');
-        $status      = strtolower($request->input('paymentStatus'));
+        $status = strtolower($request->input('paymentStatus'));
 
         $payment = PaymentModel::where('reference', $reference)->first();
         if (!$payment) {
@@ -250,9 +276,9 @@ class PaymentController extends Controller
         }
 
         $payment->update([
-            'status'          => $status,
-            'transaction_id'  => $transaction,
-            'gateway_response'=> json_encode($request->all()),
+            'status' => $status,
+            'transaction_id' => $transaction,
+            'gateway_response' => json_encode($request->all()),
         ]);
 
         return response()->json(['message' => 'ok']);
