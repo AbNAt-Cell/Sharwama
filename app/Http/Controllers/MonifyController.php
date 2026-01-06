@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Monnify\MonnifyLaravel\Facades\Monnify;
+use App\Http\Controllers\Api\V1\OrderController;
 
 class MonifyController extends Controller
 {
@@ -220,6 +221,8 @@ class MonifyController extends Controller
                     $apiStatus = $response['responseBody']['paymentStatus'];
                     if ($apiStatus === 'PAID') {
                         $status = 'success';
+                        // Create order from payment data
+                        $this->createOrderFromPayment($payment_data, $paymentReference);
                     } elseif (in_array($apiStatus, ['FAILED', 'CANCELLED'])) {
                         $status = 'fail';
                     }
@@ -317,6 +320,9 @@ class MonifyController extends Controller
                 'transaction_id' => $transactionReference,
             ]);
 
+            // Create order from payment data (webhook backup)
+            $this->createOrderFromPayment($payment_data, $paymentReference);
+
             if (function_exists($payment_data->success_hook)) {
                 call_user_func($payment_data->success_hook, $payment_data);
             }
@@ -372,5 +378,68 @@ class MonifyController extends Controller
         }
 
         return true;
+    }
+
+    /**
+     * Create order from payment data after successful payment verification
+     */
+    private function createOrderFromPayment($payment_data, $paymentReference)
+    {
+        try {
+            // Check if order already exists for this payment
+            if (!empty($payment_data->attribute_id)) {
+                Log::info('Monnify: Order already exists', ['order_id' => $payment_data->attribute_id]);
+                return;
+            }
+
+            // Decode order data from payment attribute
+            $orderData = json_decode($payment_data->attribute, true);
+
+            if (!$orderData) {
+                Log::error('Monnify: No order data found in payment', ['payment_id' => $payment_data->id]);
+                return;
+            }
+
+            Log::info('Monnify: Creating order from payment', [
+                'payment_id' => $payment_data->id,
+                'payment_reference' => $paymentReference
+            ]);
+
+            // Add transaction reference to order data
+            $orderData['transaction_reference'] = $paymentReference;
+            $orderData['payment_method'] = 'monnify';
+
+            // Create order via OrderController
+            $orderController = app(OrderController::class);
+            $orderRequest = new Request($orderData);
+
+            $response = $orderController->placeOrder($orderRequest);
+            $responseData = $response->getData(true);
+
+            if ($response->status() === 200 && isset($responseData['order_id'])) {
+                // Update payment record with order ID
+                $payment_data->update([
+                    'attribute_id' => $responseData['order_id'],
+                    'is_paid' => 1,
+                ]);
+
+                Log::info('Monnify: Order created successfully', [
+                    'order_id' => $responseData['order_id'],
+                    'payment_reference' => $paymentReference
+                ]);
+            } else {
+                Log::error('Monnify: Order creation failed', [
+                    'response' => $responseData,
+                    'payment_id' => $payment_data->id
+                ]);
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Monnify: Order creation exception', [
+                'error' => $e->getMessage(),
+                'payment_id' => $payment_data->id,
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
     }
 }
